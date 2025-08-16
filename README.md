@@ -1,108 +1,115 @@
 Drone Denoise: Propeller Noise Removal from Mixed Audio Recordings
-------------------------------------------------------------------
-
 Overview
---------
 
-This project implements a neural network-based audio denoising system that removes drone propeller noise from audio recordings while preserving human and traffic background sounds. It uses PyTorch and torchaudio libraries and supports training with real and synthetically generated audio data.
+This project implements a neural network-based audio denoising system that removes drone propeller noise from audio recordings while preserving human speech and traffic sounds. It is built with PyTorch and torchaudio, and supports both training with real recordings and generating synthetic mixtures on the fly.
 
 Directory Structure
--------------------
-
 drone_denoise/
 ├── data/
-│   ├── drone/         - Contains drone-only WAV audio files
-│   ├── human/         - Contains human/traffic-only WAV audio files
-│   └── mixture/       - Contains drone+human mixed audio files (either real or synthetic)
-├── checkpoints/       - Contains saved model weights for each epoch (e.g., epoch1.pth, epoch100.pth)
+│   ├── drone/         - Contains drone-only WAV files
+│   ├── human/         - Contains human/traffic-only WAV files
+│   └── mixture/       - Contains real or synthetic mixtures for testing
+├── checkpoints/       - Contains saved model weights (epoch1.pth, epoch100.pth, etc.)
 ├── src/
-│   ├── dataset.py     - PyTorch dataset class for loading training data
-│   ├── model.py       - Conv1D autoencoder model definition
-│   ├── train.py       - Model training script
-│   ├── infer.py       - Inference script to denoise new audio files
-│   └── synthetic.py   - Script to generate synthetic training mixtures with augmentation
-├── README.txt         - Project documentation (this file)
-└── venv/              - Python virtual environment (not included in version control)
+│   ├── dataset_on_the_fly.py - Dataset class that generates training pairs dynamically
+│   ├── model.py              - Conv1D denoiser model definition
+│   ├── train.py              - Training script
+│   ├── infer.py              - Inference script to denoise audio
+│   ├── post_filter.py        - Optional script for notch/high-pass filtering
+│   └── eval_sisnri.py        - Evaluation script using SI-SNR improvement
+├── README.md          - Project documentation (this file)
+└── venv/              - Python virtual environment (not version controlled)
 
 Requirements
-------------
 
-- Python 3.8 or later
-- PyTorch
-- torchaudio
-- numpy
-- scipy
-- tqdm
-- soundfile
+Python 3.8 or later
+
+PyTorch with MPS (Apple Silicon) or CUDA (Linux/Windows)
+
+torchaudio
+
+numpy
+
+scipy
+
+tqdm
+
+matplotlib
+
+soundfile
 
 Installation and Setup
-----------------------
 
-1. Create and activate a virtual environment:
+Create and activate a virtual environment:
 
-   python3 -m venv venv
-   source venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 
-2. Install dependencies:
 
-   pip install --upgrade pip
-   pip install torch torchaudio numpy scipy tqdm soundfile
+Install dependencies:
+
+pip install --upgrade pip
+pip install torch torchaudio numpy scipy tqdm matplotlib soundfile
 
 Data Preparation
-----------------
 
-1. Place your drone-only recordings in the folder:
-   data/drone/
+Place drone-only recordings in: data/drone/
 
-2. Place human/traffic-only background sounds in:
-   data/human/
+Place human/traffic-only recordings in: data/human/
 
-All audio files should be in WAV format, mono-channel, and at least 10 seconds long. The expected sample rate is 16000 Hz.
+Optionally, place real mixtures in: data/mixture/
+
+All audio should be WAV, mono, 16 kHz sample rate, at least 10 seconds long.
 
 Synthetic Data Generation
--------------------------
 
-To create synthetic drone-human mixtures with randomized augmentation and signal-to-noise ratios (SNR), run:
-
-   python src/synthetic.py
-
-This will populate the data/mixture/ folder with new training files.
+Synthetic mixtures can be generated automatically during training. The dataset pairs random drone and human clips, applies random SNR, and normalizes output. No precomputed mixtures are required.
 
 Training the Model
-------------------
 
-To train the Conv1D denoising autoencoder on the mixture dataset:
+To train the model on synthetic mixtures:
 
-   python src/train.py \
-     --data_dir data \
-     --save_dir checkpoints \
-     --epochs 100 \
-     --batch_size 8 \
-     --lr 1e-3
+python src/train.py \
+  --data_dir data \
+  --save_dir checkpoints \
+  --epochs 100 \
+  --batch_size 8 \
+  --lr 1e-3
 
-Model weights will be saved in the checkpoints/ folder after each epoch.
+
+Checkpoints will be saved to the checkpoints/ directory after each epoch.
 
 Denoising New Audio Files
--------------------------
 
-To apply a trained model to a new mixture audio file:
+To apply a trained model to a mixture:
 
-   python src/infer.py \
-     --checkpoint checkpoints/epoch100.pth \
-     --input data/mixture/your_file.wav \
-     --output denoised.wav
+python src/infer.py \
+  --checkpoint checkpoints/epoch100.pth \
+  --input data/mixture/your_file.wav \
+  --output denoised.wav
 
-This will output the denoised version of the selected file.
+Evaluation
+
+To compute SI-SNR improvement on synthetic test pairs:
+
+python src/eval_sisnri.py --checkpoint checkpoints/epoch100.pth --N 30
+
+Post-Filtering (Optional)
+
+After inference, optional notch and high-pass filtering can be applied to further reduce tonal drone components:
+
+python src/post_filter.py --input denoised.wav --output denoised_filtered.wav
 
 Improvement Directions
-----------------------
 
-- Transition to spectrogram-based U-Net architectures
-- Add validation set and compute SNR improvement metrics
-- Incorporate real-time processing support
-- Explore model compression for edge deployment
+Switch to spectrogram-based U-Net architectures for better separation
+
+Add validation and evaluation metrics beyond MSE
+
+Explore real-time processing and lightweight models for edge devices
+
+Increase dataset diversity with augmentation
 
 Author
-------
 
-Developed by Vivaan Chadha. This project is intended for research, prototyping, and educational purposes.
+Developed by Vivaan Chadha. Intended for research, prototyping, and educational purposes.
